@@ -14,7 +14,7 @@ final class RemoteAddAccountTests: XCTestCase {
         let url = URL(string: "http://any-url.com")!
         let (sut, httpClientSpy) = makeSut(url: url)
         sut.add(addAccountModel: makeAddAccountModel()) { _ in }
-        XCTAssertEqual(httpClientSpy.url, [url])        
+        XCTAssertEqual(httpClientSpy.url, [url])
     }
     
     func test_add_should_call_httpClient_with_correct_data() throws {
@@ -24,11 +24,15 @@ final class RemoteAddAccountTests: XCTestCase {
         XCTAssertEqual(httpClientSpy.data, addAccountModel.toData())
     }
     
-    func test_add_should_complete_with_error_if_client_fails() throws {
+    func test_add_should_complete_with_error_if_client_completes_with_error() throws {
         let (sut, httpClientSpy) = makeSut()
         let exp = expectation(description: "waiting")
-        sut.add(addAccountModel: makeAddAccountModel()) { error in
-            XCTAssertEqual(error, .unexpected)
+        sut.add(addAccountModel: makeAddAccountModel()) { result in
+            switch result {
+            case .failure(let error):
+                XCTAssertEqual(error, .unexpected)
+            case .success: XCTFail("Expected error receive \(result) instead")
+            }
             exp.fulfill()
         }
         httpClientSpy.completeWithError(.noConnectivity)
@@ -50,16 +54,16 @@ extension RemoteAddAccountTests {
     class HttpClientSpy: HttpPostClient {
         var url = [URL]()
         var data: Data?
-        var completion: ((HttpError) -> Void)?
+        var completion: ((Result<Data, HttpError>) -> Void)?
         
-        func post(to url: URL, with data: Data?, completion: @escaping (HttpError) -> Void ) {
+        func post(to url: URL, with data: Data?, completion: @escaping (Result<Data, HttpError>) -> Void) {
             self.url.append(url)
             self.data = data
             self.completion = completion
         }
         
         func completeWithError(_ error: HttpError) {
-            completion?(error)
+            completion?(.failure(error))
         }
     }
 }
